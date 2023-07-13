@@ -12,7 +12,7 @@ aruco_scale = 56.53
 SCALING = 0.4
 
 #define folder path and image name pattern
-folder_path = 'C:/Users/nicko/Spyder_Aalto_Hook/Iphone_hook_IDtest/'
+folder_path = 'C:/Users/nicko/Spyder_Aalto_Hook/iphone_11_library_moment/iphone11_117_Joose/'
 imagename_pattern = 'IMG_*.jpg'
 
 #define camera calibration params - from calibrator: current(iphone11)
@@ -27,6 +27,10 @@ aruco_points = {
     4: np.array([[smalldim + aruco_scale, largedim + aruco_scale, 0], [smalldim + 2 * aruco_scale, largedim + aruco_scale, 0],
                  [smalldim + 2 * aruco_scale, largedim + 2 * aruco_scale, 0], [smalldim + aruco_scale, largedim + 2 * aruco_scale, 0]], dtype='float32'),
 }
+
+msh.option.setNumber("General.AbortOnError", 1)
+msh.initialize(sys.argv)
+
 
 # resizing function
 def resize_image(img, SCALING):
@@ -59,6 +63,9 @@ for image_path in image_paths:
         img = cv.GaussianBlur(img, (5, 5), 5)
         # img = cv.medianBlur(img,15)
         # img = cv.medianBlur(img,25)
+        width = int(img.shape[1] )
+        height = int(img.shape[0] )
+        
 
         thresholded = cv.adaptiveThreshold(img, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 21, 10)
         ret, thresholded = cv.threshold(img, 130, 255, cv.THRESH_BINARY)
@@ -67,17 +74,36 @@ for image_path in image_paths:
         thresholded = cv.bitwise_not(thresholded)
 
         contours, hierarchy = cv.findContours(image=thresholded, mode=cv.RETR_EXTERNAL, method=cv.CHAIN_APPROX_NONE)
-
+        
         # get largest contour only
         contours = [max(contours, key=cv.contourArea)]
-
+        moments = cv.moments(contours[0])
+        cX = int(moments["m10"] / moments["m00"])
+        cY = int(moments["m01"] / moments["m00"])
+       
+        central_threshold = .3
+        distance_from_center = np.sqrt((cX - width/2)**2 + (cY - height/2)**2)
+        max_distance = np.sqrt((width/2)**2 + (height/2)**2)
+        print(distance_from_center,max_distance)
+    # Determine if the contour is off-center
+        offcenter = distance_from_center > central_threshold * max_distance
         coords = list(zip((list(contours[0][:, 0][:, 0])), (list(contours[0][:, 0][:, 1]))))
-        # print(list(coords)[::10])
-        return coords
-
+        if offcenter == False:
+            return coords
+        else:
+            return 0
+ 
     # print(image_path)
-    contour_points= (contours(image_path)[::40]) #uses contours function!!!
+    try:
+        contour_points= (contours(image_path)[::40]) #uses contours function!!!
+    
+    except:
+        print('HOOK NOT PROPERLY CENTERED, POOR LIGHTING CONDITION, OR BACKGROUND IS TOO DARK.  Please ensure photo background is white and the hook is lit from all angles.')
+        continue
 
+    #print(moments)
+    #exit()
+    
     def cvdetector(image):
         # Parameters for detection
         dictionary= cv.aruco.getPredefinedDictionary(cv.aruco.DICT_5X5_50)
@@ -160,7 +186,10 @@ for image_path in image_paths:
         return H,cameraPosition,rmat,tvec,rotation_vector
 
     H,cameraPosition,rmat,tvec,rotation_vector = solvePNPer()
-
+    if np.sqrt((cameraPosition[0]**2+cameraPosition[1]**2+cameraPosition[2]**2))> 500 or cameraPosition[2]<0 :
+        print('ERRONEOUS OR DISTANT CAMERA POSITION DETECTED (solvePNPer:,',cameraPosition,')')
+        continue #error handling
+        
     def imagedrawer(aruco_scale):
         
         
@@ -182,7 +211,7 @@ for image_path in image_paths:
         cv.imshow("Image with Coordinate Axes", image)
         cv.waitKey(0)
         cv.destroyAllWindows()
-    imagedrawer(aruco_scale)
+    #imagedrawer(aruco_scale)
 
 
     def dimensional_transforms_contours(contour_points):
@@ -255,7 +284,7 @@ for image_path in image_paths:
         wo = line_z_plane_intersection(cam_world,vector)
         world_outline.append(wo)
         
-    print(world_outline, image_path)
+    #print(world_outline, image_path)
     for value in world_outline:
             ax.scatter(*value, color="cyan", marker="." )  
 
@@ -286,11 +315,12 @@ for image_path in image_paths:
    
 
     lc = 20
-    msh.initialize(sys.argv)
     vlist = []
 
     # #NOW THE SCRIPT begins
     def polymaker(world_points, campP):
+        msh.option.setNumber("General.AbortOnError", 1) #Exception: Could not get last error Error   : Gmsh has not been initialized
+        msh.initialize(sys.argv)
             
         testcp = [[i[0],i[1],0] for i in world_points]
         #testcamp = tuple([item for sublist in campP1 for item in sublist])
@@ -381,20 +411,22 @@ for image_path in image_paths:
         #booltest2 = msh.model.occ.cut([(3, test1)], [(3, test3)], removeObject=False)
 
     polymaker(world_outline , cameraPosition)
-    print(vlist)
-    # Create the relevant msh data structures from the msh model
-    msh.model.occ.synchronize()
 
-    # Generate mesh
-    msh.model.mesh.generate()
+#print(vlist)
+# Create the relevant msh data structures from the msh model
+msh.model.occ.synchronize()
 
-    # Write mesh data
-    msh.write("GFG.msh")
+# Generate mesh
+msh.model.mesh.generate()
 
-    # Run the graphical user interface event loop
-    msh.fltk.run()
+# Write mesh data
+msh.write("GFG.msh")
 
-    # Finalize the gmsh API
-    msh.finalize()
+# Run the graphical user interface event loop
+msh.fltk.run()
+
+
+# Finalize the msh API
+msh.finalize()
 
         
