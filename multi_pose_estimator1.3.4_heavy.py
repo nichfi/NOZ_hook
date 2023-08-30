@@ -14,14 +14,15 @@ SCALING = 0.4
 vlist = []
 errorlist=[]
 
-
-#define folder path and image name pattern
-folder_path = 'C:/Users/nicko/Spyder_Aalto_Hook/iphone_11_library_moment/iphone11_117_Joose/'
+#define folder path and image name pattern 
+folder_path = 'C:/Users/skippy/Downloads/Hook23/centertest/'
 imagename_pattern = 'IMG_*.jpg'
 
 #define camera calibration params - from calibrator script: currently using Joose iphone11 folder
 CMTX = np.array([1231.5409815966082, 0.0, 809.2274068386823, 0.0, 1233.8258214550817, 583.4597389570841, 0.0, 0.0, 1.0], dtype='float32').reshape(3, 3)
 DIST = np.array([0.2604851842813399, -1.2686473647346477, -0.0027631214482377944, 0.0012125839297280072, 1.8982909964632204], dtype='float32')
+
+centerpoint = [99.53, 139.53, 0]
 
 aruco_points = {
     8: np.array([[0, 0, 0], [aruco_scale, 0, 0], [aruco_scale, aruco_scale, 0], [0, aruco_scale, 0]], dtype='float32'),
@@ -103,20 +104,16 @@ for index, image_path in enumerate(image_paths):
         img = resize_image(img,SCALING)
         img = cv.GaussianBlur(img, (5, 5), 5)
         # img = cv.medianBlur(img,15)
-        # img = cv.medianBlur(img,25)
         width = int(img.shape[1] )
         height = int(img.shape[0] )
         
-        #currently thresholding twice - fix
-        
+        #currently thresholding twice 
         thresholded = cv.adaptiveThreshold(img, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 21, -5)
         ret, thresholded = cv.threshold(img, min(drkcrnrs), 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
-        #ret, thresholded = cv.threshold(img, min(drkcrnrs), 255, cv.THRESH_BINARY)
-
+        
         # Inversion needed for contour detection to work (detect contours from zero background)
         thresholded = cv.bitwise_not(thresholded)
         contours, hierarchy = cv.findContours(image=thresholded, mode=cv.RETR_EXTERNAL, method=cv.CHAIN_APPROX_NONE)
-    
         
         # retrieve largest contour only
         contoursBIG = [max(contours, key=cv.contourArea)]
@@ -131,17 +128,21 @@ for index, image_path in enumerate(image_paths):
         print('Contour centroid displacement:',distance_from_center,'Maximum allowed displacement:', max_distance*central_threshold)
         print()
     
-    # Determine if the contour is off-center, if largest contour is offcenter return 0
+        # Determine if the contour is off-center, if largest contour is offcenter return 0
         offcenter = distance_from_center > central_threshold * max_distance
         coords = list(zip((list(contoursBIG[0][:, 0][:, 0])), (list(contoursBIG[0][:, 0][:, 1]))))
-        img_with_contours = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
-        cv.drawContours(img_with_contours, [contoursBIG[0]], -1, (0, 255, 0), 2)
-    
+        # image for debugging - optional
+        # img_with_contours = cv.cvtColor(img, cv.COLOR_GRAY2BGR,cv.WINDOW_NORMAL)
+        # cv.drawContours(img_with_contours, [contoursBIG[0]], -1, (0, 255, 0), 2)
+        # cv.imshow('Largest Contour Highlight', img_with_contours)
+        # cv.waitKey(0)
+        # cv.destroyAllWindows()
         
-
+        #only for testcenter - test
+        offcenter = True
         
         if offcenter == False:
-            # Show the largest contours
+            # Show the largest contours - optional
             # cv.imshow('Largest Contour Highlight', img_with_contours)
             # cv.waitKey(0)
             # cv.destroyAllWindows()
@@ -171,13 +172,12 @@ for index, image_path in enumerate(image_paths):
             coords = list(zip((list(contours[x][:, 0][:, 0])), (list(contours[x][:, 0][:, 1]))))
             img_with_contours = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
             cv.drawContours(img_with_contours, [contours[x]], -1, (0, 255, 0), 2)
-        
-            # # Show the image with contours
+            return coords
+            # # Show the image with contours - optional
             # cv.imshow('Central Contour Highlight', img_with_contours)
             # cv.waitKey(0)
             # cv.destroyAllWindows()
         
- 
     # Error handling for 0 contour result, continues loop. - check lighting and avoid dark objects in background or periphery')
     try:
         contour_points= (contoursfinder(image_path)[::10]) #uses contours function!!!
@@ -187,9 +187,7 @@ for index, image_path in enumerate(image_paths):
         continue
 
 
-#previois spot
-
-    #
+    #creating plane of arucos
     def multi_pose_estimator(ids):
         # Initialize lists to store matched image points and correspondi0ng object points
         matched_image_points = []
@@ -199,7 +197,6 @@ for index, image_path in enumerate(image_paths):
         key_list = []
         for key in aruco_points:
             key_list.append(key)
-
 
         # create image points and object point arrays based on aruco_id values
         for i, value in enumerate(key_list):
@@ -234,10 +231,12 @@ for index, image_path in enumerate(image_paths):
 
     reshaped_array_img, reshaped_array_obj = multi_pose_estimator(ids)
 
+    
     def solvePNPer():
         # Perform camera pose estimation using solvePnP
         success, rotation_vector, tvec = cv.solvePnP(
             reshaped_array_obj , reshaped_array_img , CMTX, DIST)
+        #optional
         # print("Rotation Vector:")
         # print(rotation_vector)
         # print("Translation Vector:")
@@ -256,13 +255,13 @@ for index, image_path in enumerate(image_paths):
         return H,cameraPosition,rmat,tvec,rotation_vector
 
     H,cameraPosition,rmat,tvec,rotation_vector = solvePNPer()
-    if np.sqrt((cameraPosition[0]**2+cameraPosition[1]**2+cameraPosition[2]**2))> 500 or cameraPosition[2]<0 :
+    if np.sqrt((cameraPosition[0]**2+cameraPosition[1]**2+cameraPosition[2]**2))> 900 or cameraPosition[2]<0 :
         print('solvePNPer(: erroneous or distant camera position detected (x,y,z:,',cameraPosition,')')
         print()
         continue #error handling
-        
+       
+    #optional   
     def imagedrawer(aruco_scale):
-        
         
         # Draw coordinate axes on the image
         axis_length = aruco_scale *.2  # Adjust the length of the coordinate axes as per your preference
@@ -278,11 +277,11 @@ for index, image_path in enumerate(image_paths):
         cv.namedWindow("Image with Coordinate Axes", cv.WINDOW_NORMAL)    # Create window with freedom of dimensions
         
         #draw in a small window / for debugging
-        # cv.aruco.drawDetectedMarkers(image, corners, ids)
-        # cv.imshow("Image with Coordinate Axes", image)
-        # cv.waitKey(0)
-        # cv.destroyAllWindows()
-    #imagedrawer(aruco_scale)
+        cv.aruco.drawDetectedMarkers(image, corners, ids)
+        cv.imshow("Image with Coordinate Axes", image)
+        cv.waitKey(0)
+        cv.destroyAllWindows()
+    imagedrawer(aruco_scale)
 
 
     def dimensional_transforms_contours(contour_points):
@@ -291,12 +290,7 @@ for index, image_path in enumerate(image_paths):
         stackx=[]
         point3D = []
         d=0
-        # Extract the (1, 2) arrays into a new tuple
-        # new_array = np.concatenate([array.reshape(-1, 2) for array in corners], axis=0)
-        # newtouple = [tuple(row) for row in new_array]#contour_points = contour_points.append(new_array)
-        # print(newtouple)
-        #contour_points = contour_points.append(newtouple[0])
-        
+        pwlist = []
         for point in contour_points:
         
             u, v = point
@@ -309,7 +303,7 @@ for index, image_path in enumerate(image_paths):
 
             # Transform pixel camera coordinate to World coordinate frame 
             pw = -rmat.T.dot(tvec) + (rmat.T@pc) 
-        
+            pwlist.append(pw)
             # Transform camera origin in World coordinate frame
             cam = np.array([0,0,0]).T; cam.shape = (3,1)
             cam_world = -rmat.T.dot(tvec) + rmat.T @ cam
@@ -322,11 +316,12 @@ for index, image_path in enumerate(image_paths):
             
             point3D.append(p3D)
             
-        return stackx,cam_world
+        return stackx,cam_world,pwlist
 
-    stackx,cam_world = dimensional_transforms_contours(contour_points)
-    # Plotting the lines between the camera position and the unit vectors
+    stackx,cam_world,pwlist  = dimensional_transforms_contours(contour_points)
     
+    
+    # Plotting the lines between the camera position and the unit vectors
     world_outline = []
     def line_z_plane_intersection(point, direction):
         x, y, z = point
@@ -340,7 +335,7 @@ for index, image_path in enumerate(image_paths):
         t = -z / dz
         x_intercept = x + dx * t
         y_intercept = y + dy * t
-        z_intercept = 40
+        z_intercept = 0
         
         world_outline = (x_intercept, y_intercept, z_intercept)
         return world_outline
@@ -358,7 +353,7 @@ for index, image_path in enumerate(image_paths):
     for value in world_outline:
             ax.scatter(*value, color="cyan", marker="." )   
 
-
+    #optional
     def arucos_world():
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
@@ -375,6 +370,19 @@ for index, image_path in enumerate(image_paths):
         for value in world_outline:
             ax.scatter(*value, color="cyan", marker="." )  
 
+              # Add the centerpoint here
+        centerpoint = [[99.53], [139.53], [0]]
+        ax.scatter(*centerpoint, color="red", marker="o")  # Use a red circle marker for the centerpoint
+        
+        # Calculate the ray between the centerpoint and cameraPosition
+        ray_vector = cameraPosition - centerpoint
+        print('Ray Vector:', ray_vector)
+        # Plot the ray as a line from the centerpoint to cameraPosition
+        ax.plot([centerpoint[0], cameraPosition[0]],
+            [centerpoint[1], cameraPosition[1]],
+            [centerpoint[2], cameraPosition[2]],
+            color='green', linestyle='--')
+        
         ax.elev = 45
         ax.azim = -90
         ax.set_xlabel('X-axis')
@@ -384,12 +392,10 @@ for index, image_path in enumerate(image_paths):
         plt.show()
 
     arucos_world() #Comment to erase aruco real world values
-
-   
-
     lc = 20
 
-    # #NOW THE SCRIPT begins
+
+    # STL SCRIPT begins
     def polymaker(world_points, campP):
         msh.initialize()
         msh.option.setNumber("General.AbortOnError", 1) #Exception: Could not get last error Error   : Gmsh has not been initialized
@@ -485,14 +491,13 @@ for index, image_path in enumerate(image_paths):
     _,v =polymaker(world_outline , cameraPosition)
     vlist.append(v)
     print()
-    if len(vlist) >  2: #test
-        break
+    #optional  
+    # if len(vlist) >  2: #test
+    #     break
 
 #print('v',v)
 
-
 # #Now, perform boolean intersection with subsequent volumes
-
 #bool_result = msh.model.occ.intersect([(3, 3)], [(3, 8)], 8, removeObject=True, removeTool=True)
 #print(bool_result,'bool result')
 msh.model.occ.synchronize()
