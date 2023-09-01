@@ -15,12 +15,16 @@ vlist = []
 errorlist=[]
 
 #define folder path and image name pattern 
-folder_path = 'C:/Users/skippy/Downloads/Hook23/centertest/'
-imagename_pattern = 'IMG_*.jpg'
+folder_path = 'C:/Users/nicko/Spyder_Aalto_Hook/sdcard_procam/'
+imagename_pattern = 'IMG*'
 
 #define camera calibration params - from calibrator script: currently using Joose iphone11 folder
-CMTX = np.array([1231.5409815966082, 0.0, 809.2274068386823, 0.0, 1233.8258214550817, 583.4597389570841, 0.0, 0.0, 1.0], dtype='float32').reshape(3, 3)
-DIST = np.array([0.2604851842813399, -1.2686473647346477, -0.0027631214482377944, 0.0012125839297280072, 1.8982909964632204], dtype='float32')
+# CMTX = np.array([1231.5409815966082, 0.0, 809.2274068386823, 0.0, 1233.8258214550817, 583.4597389570841, 0.0, 0.0, 1.0], dtype='float32').reshape(3, 3)
+# DIST = np.array([0.2604851842813399, -1.2686473647346477, -0.0027631214482377944, 0.0012125839297280072, 1.8982909964632204], dtype='float32')
+#for procam checker 1 .4
+CMTX = np.array([1156.8361842962481, 0.0, 602.5193809906307, 0.0, 1155.4587429108044, 802.5231337051961, 0.0, 0.0, 1.0], dtype='float32').reshape(3, 3)
+DIST = np.array([-0.07340364563454689, 0.3237118230528758, 0.0015036752884026255, -0.00010017544216576494, -0.40144988224708344], dtype='float32')
+
 
 centerpoint = [99.53, 139.53, 0]
 
@@ -45,13 +49,12 @@ def calculate_darkness(image, contour):
     mask = np.zeros(image.shape[:2], dtype=np.uint8)
     cv.drawContours(mask, [contour], 0, 255, -1)
     masked_image = cv.bitwise_and(image, image, mask=mask)
-    darkness_value = np.mean(masked_image[mask > 0])
+    darkness_value = np.mean(masked_image[mask > 0]) - 25
     return darkness_value
 
 
 # resizing function
 def resize_image(img, SCALING):
-    # adapted from from: https://www.tutorialkart.com/opencv/python/opencv-python-resize-image/
     width = int(img.shape[1] * SCALING)
     height = int(img.shape[0] * SCALING)
     dim = (width, height)
@@ -161,7 +164,7 @@ for index, image_path in enumerate(image_paths):
                 cX = int(i["m10"] / i["m00"])
                 cY = int(i["m01"] / i["m00"])
                 distance_from_center = np.sqrt((cX - width/2)**2 + (cY - height/2)**2)
-                print(distance_from_center,'centroid distance from center')
+                #print(distance_from_center,'centroid distance from center')
                 centroid_list.append(distance_from_center)
             
             mincentroid = (min(centroid_list))
@@ -180,7 +183,7 @@ for index, image_path in enumerate(image_paths):
         
     # Error handling for 0 contour result, continues loop. - check lighting and avoid dark objects in background or periphery')
     try:
-        contour_points= (contoursfinder(image_path)[::10]) #uses contours function!!!
+        contour_points= (contoursfinder(image_path)[::5]) #uses contours function!!!
     except:
         print('contours(',image_path,'): contrast outline too far from center, moving to next picture')
         print()
@@ -281,7 +284,7 @@ for index, image_path in enumerate(image_paths):
         cv.imshow("Image with Coordinate Axes", image)
         cv.waitKey(0)
         cv.destroyAllWindows()
-    imagedrawer(aruco_scale)
+    #imagedrawer(aruco_scale)
 
 
     def dimensional_transforms_contours(contour_points):
@@ -352,7 +355,14 @@ for index, image_path in enumerate(image_paths):
     #print(world_outline, image_path)
     for value in world_outline:
             ax.scatter(*value, color="cyan", marker="." )   
-
+    ax.elev = 90
+    ax.azim = -90
+    ax.set_xlabel('X-axis')
+    ax.set_ylabel('Y-axis')
+    ax.set_zlabel('Z-axis')
+    ax.set_aspect('equal', 'box')
+    plt.show()
+        
     #optional
     def arucos_world():
         fig = plt.figure()
@@ -376,20 +386,23 @@ for index, image_path in enumerate(image_paths):
         
         # Calculate the ray between the centerpoint and cameraPosition
         ray_vector = cameraPosition - centerpoint
-        print('Ray Vector:', ray_vector)
         # Plot the ray as a line from the centerpoint to cameraPosition
         ax.plot([centerpoint[0], cameraPosition[0]],
             [centerpoint[1], cameraPosition[1]],
             [centerpoint[2], cameraPosition[2]],
             color='green', linestyle='--')
-        
-        ax.elev = 45
+        line_length = np.linalg.norm(centerpoint - cameraPosition)
+
+        print("Length of the line:", line_length)
+
+        ax.elev = 90
         ax.azim = -90
         ax.set_xlabel('X-axis')
         ax.set_ylabel('Y-axis')
         ax.set_zlabel('Z-axis')
         ax.set_aspect('equal', 'box')
         plt.show()
+        return(ray_vector)
 
     arucos_world() #Comment to erase aruco real world values
     lc = 20
@@ -500,17 +513,23 @@ for index, image_path in enumerate(image_paths):
 # #Now, perform boolean intersection with subsequent volumes
 #bool_result = msh.model.occ.intersect([(3, 3)], [(3, 8)], 8, removeObject=True, removeTool=True)
 #print(bool_result,'bool result')
-msh.model.occ.synchronize()
-msh.model.mesh.generate()
-two = msh.model.occ.intersect([(3, 3)], [(3, 2)], 8,removeObject=False, removeTool=False)
+# msh.model.occ.synchronize()
+# msh.model.mesh.generate()
+# two = msh.model.occ.intersect([(3, 1)], [(3, 2)], 3,removeObject=True, removeTool=True)
 
 
 
 
-# #Working Example of Boolean - note: booleans must be done one by one.
+# # #Working Example of Boolean - note: booleans must be done one by one.
 # booled_object_list = [ [element] for element in vlist ]
-# for i,value in booled_object_list :
-#     booled_object_list[i+1] = msh.model.occ.intersect([(3,booled_object_list[value])],[(3,1)],removeObject= False, removeTool = True)
+# for i,value in enumerate (booled_object_list) :
+#     booled_object_list[len(vlist)+1] = msh.model.occ.intersect([(3,booled_object_list[value])],[(3,1)],removeObject= False, removeTool = True)
+
+# # Working Example of Boolean - note: booleans must be done one by one.
+# booled_object_list = [[element] for element in vlist]
+# for i, value in enumerate(booled_object_list):
+#     booled_object_list[i] = msh.model.occ.intersect([(3, booled_object_list[i])], [(3, 1)], removeObject=False, removeTool=True)
+
 
 # print(booled_object_list)
 # #print(vlist)
