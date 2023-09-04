@@ -56,9 +56,9 @@ After blur
 
 I have cut some cubes on Sunday and printed out 12 aruco markers to use on them.  I think this would be worth a shot, but in the past you have stated that this hook issue only should use the one sided view so I did not focus on it.  This has been somewhat confusing, as visual hull is most effective for 3D measurements that require a complete object, in this case I believe that using diplib (https://pypi.org/project/diplib) would be a more worthy solution.  Additionally, if the typical caliper measurement were to be displaced by a phone application, I would expect that it offers a substantial improvement to the traditional methods.  Both polycam and any homebrewed/open-source software wll take more time than caliper measurement.  The only digital application I can see would be if the crane was in a precarious location.  For that, a 2D method could likely be utilized by controlling the exact location of the crane and camera in an area where humans could not reach.
 
-To summarize:  For the konecranes project, I think another method would work better, but this does have the opportunity to be a decent solution for those looking to explore the properties of visual hull.
+To summarize:  For the konecranes project, I think another method would work better unless this is improved neary tenfold, but this does have the opportunity to be a decent solution for those looking to explore the properties of visual hull right now.
 
-I have a few solutions to the inaccuracy, we can talk about them tomorrow.
+I have a few solutions to the inaccuracy thst might make it feasible for cranes use case, but im still hesitant, we can talk about them tomorrow.
 
 ex. Dynamic camera matrices, aruco coordinate and contour detecting on different resolution images
 
