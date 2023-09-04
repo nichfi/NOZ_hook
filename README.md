@@ -62,4 +62,7 @@ I have a few solutions to the inaccuracy, we can talk about them tomorrow.
 
 ex. Dynamic camera matrices, aruco coordinate and contour detecting on different resolution images
 
+Measurement Results: 
+https://docs.google.com/document/d/1WT4fFXc_9t_Cw0HptHW2BK2zd4y0bLuXEGE4vyNoMW8 
+
 
