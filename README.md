@@ -45,7 +45,7 @@ This script is provided under the MIT License. Feel free to modify and use it fo
 
 ## Results 3/9/23
 
-Small hook that Joose measured, approximately 2mm error.  It is too large.  This could be due to several factors: the need to blur the image for best edge detection, an edge that is detected on the 'outside' edge of the hook blur (extra pixel of innacuracy), need to de-res the image for calibration, imperfect calibration due to the need to fix the focal length.  I do not think this method is worth continuing to research on its own.  It is possible that creating a 360 degree capture program with aruco cubes and open sourcing it would be novel and give amateur users like young students or tinkerers an alternative to polycam.  This is possible with the current setup and changes only one fundamental portion of the code.
+Small hook that Joose measured, approximately 2mm error.  It is too large.  This could be due to several factors: the need to blur the image for best edge detection, an edge that is detected on the 'outside' edge of the hook blur (extra pixel of innacuracy), need to de-res the image for calibration, imperfect calibration due to the need to fix the focal length.  I do not think this method is worth an industrial app as of now.  It is possible that creating a 360 degree capture program with aruco cubes and open sourcing it would be novel and give amateur users like young students or tinkerers an alternative to polycam.  This is possible with the current setup and changes only one fundamental portion of the code.
 
 Before blur
 ![SDcard_jpg_unprocessed](https://github.com/nichfi/NOZ_hook/assets/129064580/86f59cad-234e-4037-a99c-05999ba96375)
