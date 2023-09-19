@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Sep  5 19:46:17 2023
+
+@author: nicko
+"""
+
 from matplotlib import pyplot as plt
 import cv2 as cv
 import numpy as np
@@ -7,28 +14,39 @@ import gmsh as msh
 import sys
 import logging
 
-smalldim = 86
-largedim = 166
-aruco_scale = 56.53
+smalldim = 66.31
+largedim = 82.19
+aruco_scale = 56.76
 SCALING = 0.4
+debugmode=0
 vlist = []
 errorlist=[]
 
 #define folder path and image name pattern 
-folder_path = 'C:/Users/skippy/Downloads/Hook23/SdCard_procam_rangetest-20230901T091422Z-001/SdCard_procam_rangetest'
-folder_path = 'C:/Users/skippy/Downloads/output_frames'
-
-imagename_pattern = 'frame*'
+folder_path = 'C:/Users/nicko/Downloads/'
+imagename_pattern = 'IMG_20230906_181423*'
 
 #define camera calibration params - from calibrator script: currently using Joose iphone11 folder
-# CMTX = np.array([1231.5409815966082, 0.0, 809.2274068386823, 0.0, 1233.8258214550817, 583.4597389570841, 0.0, 0.0, 1.0], dtype='float32').reshape(3, 3)
+# CMTX = np.array([1231.5409815966082, 0.0, 809.22740[-68386823, 0.0, 1233.8258214550817, 583.4597389570841, 0.0, 0.0, 1.0], dtype='float32').reshape(3, 3)
 # DIST = np.array([0.2604851842813399, -1.2686473647346477, -0.0027631214482377944, 0.0012125839297280072, 1.8982909964632204], dtype='float32')
 #for procam checker 1 .4
-CMTX = np.array([1156.8361842962481, 0.0, 602.5193809906307, 0.0, 1155.4587429108044, 802.5231337051961, 0.0, 0.0, 1.0], dtype='float32').reshape(3, 3)
-DIST = np.array([-0.07340364563454689, 0.3237118230528758, 0.0015036752884026255, -0.00010017544216576494, -0.40144988224708344], dtype='float32')
+# CMTX = np.array([1156.8361842962481, 0.0, 602.5193809906307, 0.0, 1155.4587429108044, 802.5231337051961, 0.0, 0.0, 1.0], dtype='float32').reshape(3, 3)
+# DIST = np.array([-0.07340364563454689, 0.3237118230528758, 0.0015036752884026255, -0.00010017544216576494, -0.40144988224708344], dtype='float32')
 
+# Procam small
+# CMTX = np.array([1156.8361842962481, 0.0, 602.5193809906307, 0.0, 1155.4587429108044, 802.5231337051961, 0.0, 0.0, 1.0], dtype='float32').reshape(3, 3)
+# DIST = np.array([-0.07340364563454689, 0.3237118230528758, 0.0015036752884026255, -0.00010017544216576494, -0.40144988224708344], dtype='float32')
+#procam_remeasured
+# CMTX = np.array([363.40274411526906, 0.0, 195.3764106761795, 0.0, 363.72093472114784, 256.5031233114503, 0.0, 0.0, 1.0], dtype='float32').reshape(3, 3)
+# DIST = np.array([-0.058551058619618845, 0.33480868732908253, 0.0010543745032795722, -0.001023935262334852, -0.5430476006001702], dtype='float32')
+#procam_remeasured_no_glare
+# CMTX = np.array([738.9090683753249, 0.0, 390.4196137797938, 0.0, 739.1264740734568, 511.32994803059637, 0.0, 0.0, 1.0], dtype='float32').reshape(3, 3)
+# DIST = np.array([-0.03882346140102668, 0.20717019978089832, -0.000911731929343776, -8.051361341482986e-05, -0.3432625783785088], dtype='float32')
 
-centerpoint = [99.53, 139.53, 0]
+CMTX = np.array([738.4391110895575, 0.0, 391.10649709357614, 0.0, 737.6804692382966, 516.2104937135692, 0.0, 0.0, 1.0], dtype='float32').reshape(3, 3)
+DIST = np.array([-0.028550282679872235, -0.01788452651293315, -0.0002072655617462208, 0.0006906692231601624, 0.5017724257813853], dtype='float32')
+
+centerpoint = [((aruco_scale*2)+smalldim)/2 , (aruco_scale*2+largedim)/2, 0]
 
 aruco_points = {
     8: np.array([[0, 0, 0], [aruco_scale, 0, 0], [aruco_scale, aruco_scale, 0], [0, aruco_scale, 0]], dtype='float32'),
@@ -42,12 +60,13 @@ aruco_points = {
 
 
 #options for msh - move later
-msh.option.setNumber("General.AbortOnError", 1)
 msh.initialize(sys.argv)
+
+msh.option.setNumber("General.AbortOnError", 0)
 
 
 #darkness calculator
-def calculate_darkness(image, contour):
+def Darkness_Calculator(image, contour):
     mask = np.zeros(image.shape[:2], dtype=np.uint8)
     cv.drawContours(mask, [contour], 0, 255, -1)
     masked_image = cv.bitwise_and(image, image, mask=mask)
@@ -56,7 +75,7 @@ def calculate_darkness(image, contour):
 
 
 # resizing function
-def resize_image(img, SCALING):
+def Image_Resizer(img, SCALING):
     width = int(img.shape[1] * SCALING)
     height = int(img.shape[0] * SCALING)
     dim = (width, height)
@@ -71,7 +90,7 @@ image_paths = glob.glob(os.path.join(folder_path, imagename_pattern))
 for index, image_path in enumerate(image_paths):
     image = cv.imread(image_path)
     #resize function called
-    image = resize_image(image, SCALING)
+    image = Image_Resizer(image, SCALING)
     #print the image in the sequence that was scanned
     print()
     print(f"Scanning image #:{index}")
@@ -79,7 +98,9 @@ for index, image_path in enumerate(image_paths):
     print()
 
     # Detects aruco corners, IDS, and darkness values
-    def cvdetector(image):
+    def Aruco_Detector(image):
+        print("Detecting Arucos with Aruco_Detector")
+        print()
         # Parameters for detection
         dictionary= cv.aruco.getPredefinedDictionary(cv.aruco.DICT_5X5_50)
         parameters = cv.aruco.DetectorParameters()
@@ -94,23 +115,22 @@ for index, image_path in enumerate(image_paths):
         drkcrnrs = []
         for i in range(len(corners)):
             # Calculate the darkness value of the black portion of the marker
-            darkness = calculate_darkness(image, corners[i][0].astype(int))
+            darkness = Darkness_Calculator(image, corners[i][0].astype(int))
             drkcrnrs.append(darkness)
             print(f"Marker {ids[i][0]} Darkness: {darkness:.2f}")
-        print('darkest corner:', min(drkcrnrs))  
+        print('Darkest corner:', min(drkcrnrs))  
         
         return corners, ids, darkness, drkcrnrs
 
-    corners, ids, darkness, drkcrnrs = cvdetector(image)
+    corners, ids, darkness, drkcrnrs = Aruco_Detector(image)
 
     #detects outlines of hook (uses independent resizing because of different Gamma requirements)
-    def contoursfinder(imagename):
+    def Contour_Finder(imagename):
+        print("Finding Contours")
+        print()
         img = cv.imread(imagename, 0)
-        img = resize_image(img,SCALING)
-        # cv.imshow('resized image', img)
-        # cv.waitKey(0)
-        # cv.destroyAllWindows()
-        img = cv.GaussianBlur(img, (3, 3), 2)
+        img = Image_Resizer(img,SCALING)
+        img = cv.GaussianBlur(img, (5, 5), 5)
         # img = cv.medianBlur(img,15)
         width = int(img.shape[1] )
         height = int(img.shape[0] )
@@ -118,9 +138,7 @@ for index, image_path in enumerate(image_paths):
         #currently thresholding twice 
         thresholded = cv.adaptiveThreshold(img, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 21, -5)
         ret, thresholded = cv.threshold(img, min(drkcrnrs), 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
-        # cv.imshow('resized image', thresholded)
-        # cv.waitKey(0)
-        # cv.destroyAllWindows()
+        
         # Inversion needed for contour detection to work (detect contours from zero background)
         thresholded = cv.bitwise_not(thresholded)
         contours, hierarchy = cv.findContours(image=thresholded, mode=cv.RETR_EXTERNAL, method=cv.CHAIN_APPROX_NONE)
@@ -142,41 +160,35 @@ for index, image_path in enumerate(image_paths):
         offcenter = distance_from_center > central_threshold * max_distance
         coords = list(zip((list(contoursBIG[0][:, 0][:, 0])), (list(contoursBIG[0][:, 0][:, 1]))))
         # image for debugging - optional
-        img_with_contours = cv.cvtColor(img, cv.COLOR_GRAY2BGR,cv.WINDOW_NORMAL)
-        # cv.drawContours(img_with_contours, [contoursBIG[0]], -1, (0, 255, 0), 2)
-        # cv.imshow('Largest Contour Highlight', img_with_contours)
-        # cv.waitKey(0)
-        # cv.destroyAllWindows()
-        
+        if debugmode == 1:
+            img_with_contours = cv.cvtColor(img, cv.COLOR_GRAY2BGR,cv.WINDOW_NORMAL)
+            cv.drawContours(img_with_contours, [contoursBIG[0]], -1, (0, 255, 0), 2)
+            cv.imshow('Largest Contour Highlight', img_with_contours)
+            cv.waitKey(0)
+            cv.destroyAllWindows()
         
         #only for testcenter - test
-        # offcenter = True
+        offcenter = True
         
         if offcenter == False:
-            # Show the largest contours - optional
-            # cv.imshow('Largest Contour Highlight', img_with_contours)
-            # cv.waitKey(0)
-            # cv.destroyAllWindows()
             return coords
         
         else:
-            print('1')
             # retrieve central contour
             momentlist = []
             
             for i in contours:
                 moments = cv.moments(i)
                 momentlist.append(moments)
-                print('2')
+                
             centroid_list = []
             for i in momentlist:
-                print('3 ')
                 cX = int(i["m10"] / i["m00"])
                 cY = int(i["m01"] / i["m00"])
                 distance_from_center = np.sqrt((cX - width/2)**2 + (cY - height/2)**2)
                 #print(distance_from_center,'centroid distance from center')
                 centroid_list.append(distance_from_center)
-           
+            
             mincentroid = (min(centroid_list))
             print(min(centroid_list),'min centroid distance')
             x = centroid_list.index(mincentroid)
@@ -185,17 +197,17 @@ for index, image_path in enumerate(image_paths):
             coords = list(zip((list(contours[x][:, 0][:, 0])), (list(contours[x][:, 0][:, 1]))))
             img_with_contours = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
             cv.drawContours(img_with_contours, [contours[x]], -1, (0, 255, 0), 2)
-            # Show the image with contours - optional
-            cv.imshow('Central Contour Highlight', img_with_contours)
-            cv.waitKey(0)
-            cv.destroyAllWindows()
             return coords
-            
-        
+            # # Show the image with contours - optional
+            if debugmode ==1:
+                
+                cv.imshow('Central Contour Highlight', img_with_contours)
+                cv.waitKey(0)
+                cv.destroyAllWindows()
         
     # Error handling for 0 contour result, continues loop. - check lighting and avoid dark objects in background or periphery')
     try:
-        contour_points= (contoursfinder(image_path)[::5]) #uses contours function!!!
+        contour_points= (Contour_Finder(image_path)[::5]) #uses contours function!!!
     except:
         print('contours(',image_path,'): contrast outline too far from center, moving to next picture')
         print()
@@ -203,7 +215,7 @@ for index, image_path in enumerate(image_paths):
 
 
     #creating plane of arucos
-    def multi_pose_estimator(ids):
+    def Pose_Estimator(ids):
         # Initialize lists to store matched image points and correspondi0ng object points
         matched_image_points = []
         matched_object_points = []
@@ -244,10 +256,10 @@ for index, image_path in enumerate(image_paths):
         reshaped_array_obj = np.reshape(matched_object_points , (shaper, 3))
         return reshaped_array_img, reshaped_array_obj
 
-    reshaped_array_img, reshaped_array_obj = multi_pose_estimator(ids)
+    reshaped_array_img, reshaped_array_obj = Pose_Estimator(ids)
 
     
-    def solvePNPer():
+    def Perspective_Solver():
         # Perform camera pose estimation using solvePnP
         success, rotation_vector, tvec = cv.solvePnP(
             reshaped_array_obj , reshaped_array_img , CMTX, DIST)
@@ -269,14 +281,14 @@ for index, image_path in enumerate(image_paths):
         H = CMTX @ np.column_stack((rmat[:, 0], rmat[:, 1], tvec[:, 0]))
         return H,cameraPosition,rmat,tvec,rotation_vector
 
-    H,cameraPosition,rmat,tvec,rotation_vector = solvePNPer()
+    H,cameraPosition,rmat,tvec,rotation_vector = Perspective_Solver()
     if np.sqrt((cameraPosition[0]**2+cameraPosition[1]**2+cameraPosition[2]**2))> 900 or cameraPosition[2]<0 :
-        print('solvePNPer(: erroneous or distant camera position detected (x,y,z:,',cameraPosition,')')
+        print('Perspective_Solver(: erroneous or distant camera position detected (x,y,z:,',cameraPosition,')')
         print()
         continue #error handling
        
     #optional   
-    def imagedrawer(aruco_scale):
+    def Plot_Arucos(aruco_scale):
         
         # Draw coordinate axes on the image
         axis_length = aruco_scale *.2  # Adjust the length of the coordinate axes as per your preference
@@ -296,10 +308,11 @@ for index, image_path in enumerate(image_paths):
         cv.imshow("Image with Coordinate Axes", image)
         cv.waitKey(0)
         cv.destroyAllWindows()
-    #imagedrawer(aruco_scale)
+    if debugmode ==1:
+        Plot_Arucos(aruco_scale)
 
 
-    def dimensional_transforms_contours(contour_points):
+    def Dimensional_Transform_Manual(contour_points):
        
         # Convert 2D points to 3D rays
         stackx=[]
@@ -318,14 +331,33 @@ for index, image_path in enumerate(image_paths):
 
             # Transform pixel camera coordinate to World coordinate frame 
             pw = -rmat.T.dot(tvec) + (rmat.T@pc) 
+            # pw = 
             pwlist.append(pw)
             # Transform camera origin in World coordinate frame
             cam = np.array([0,0,0]).T; cam.shape = (3,1)
             cam_world = -rmat.T.dot(tvec) + rmat.T @ cam
             
+            leftSideMat = (np.linalg.inv(rmat)*np.linalg.inv(CMTX)*p)
+            rightSideMat = (np.linalg.inv(rmat)*tvec)
+            
+            Zconst = 285.0
+
+            # Assuming rightSideMat and leftSideMat are NumPy matrices (2D arrays)
+            # You may need to create them or load them as per your data
+            
+            # Calculate 's' as per the C code
+            s = (Zconst + rightSideMat[2, 0]) / leftSideMat[2, 0]
+            
+            # Print the result
+            print("The value of s:", s)
+
+            
+            print('s',s)
             vector = pw - cam_world
             unit_vector = vector / np.linalg.norm(vector)
-            
+            print('vector',vector)
+            print('unitvector',unit_vector)
+
             stackx.append(unit_vector)
             p3D = cam_world + d * unit_vector
             
@@ -333,12 +365,12 @@ for index, image_path in enumerate(image_paths):
             
         return stackx,cam_world,pwlist
 
-    stackx,cam_world,pwlist  = dimensional_transforms_contours(contour_points)
+    stackx,cam_world,pwlist  = Dimensional_Transform_Manual(contour_points)
     
     
     # Plotting the lines between the camera position and the unit vectors
     world_outline = []
-    def line_z_plane_intersection(point, direction):
+    def Set_Object_Plane(point, direction):
         x, y, z = point
         dx, dy, dz = direction
         
@@ -354,33 +386,14 @@ for index, image_path in enumerate(image_paths):
         
         world_outline = (x_intercept, y_intercept, z_intercept)
         return world_outline
-        
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
 
     world_outline = []
-
-    for vector in stackx:
-        wo = line_z_plane_intersection(cam_world,vector)
-        world_outline.append(wo)
-        
-    #print(world_outline, image_path)
-    for value in world_outline:
-            ax.scatter(*value, color="cyan", marker="." )   
-    ax.elev = 90
-    ax.azim = -90
-    ax.set_xlabel('X-axis')
-    ax.set_ylabel('Y-axis')
-    ax.set_zlabel('Z-axis')
-    ax.set_aspect('equal', 'box')
-    plt.show()
-        
     #optional
     def arucos_world():
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
 
-        ax.scatter(*cam_world[:, 0],color='hotpink',label='Camera Position OG',marker = '2')
+        ax.scatter(*cameraPosition[:, 0],color='hotpink',label='Camera Position OG',marker = '2')
         
         aruco_points_list=[]
         
@@ -393,17 +406,36 @@ for index, image_path in enumerate(image_paths):
             ax.scatter(*value, color="cyan", marker="." )  
 
               # Add the centerpoint here
-        centerpoint = [[99.53], [139.53], [0]]
+
         ax.scatter(*centerpoint, color="red", marker="o")  # Use a red circle marker for the centerpoint
         
-        # Calculate the ray between the centerpoint and cam_world
-        ray_vector = cam_world - centerpoint
-        # Plot the ray as a line from the centerpoint to cam_world
-        ax.plot([centerpoint[0], cam_world[0]],
-            [centerpoint[1], cam_world[1]],
-            [centerpoint[2], cam_world[2]],
+        # Calculate the ray between the centerpoint and cameraPosition
+        ray_vector = cameraPosition - centerpoint
+        # Plot the ray as a line from the centerpoint to cameraPosition
+        ax.plot([centerpoint[0], cameraPosition[0]],
+            [centerpoint[1], cameraPosition[1]],
+            [centerpoint[2], cameraPosition[2]],
             color='green', linestyle='--')
-        line_length = np.linalg.norm(centerpoint - cam_world)
+        line_length = np.linalg.norm(centerpoint - cameraPosition)
+        
+                
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        
+        for vector in stackx:
+            wo = Set_Object_Plane(cam_world,vector)
+            world_outline.append(wo)
+            
+        #print(world_outline, image_path)
+        for value in world_outline:
+                ax.scatter(*value, color="cyan", marker="." )   
+        ax.elev = 90
+        ax.azim = -90
+        ax.set_xlabel('X-axis')
+        ax.set_ylabel('Y-axis')
+        ax.set_zlabel('Z-axis')
+        ax.set_aspect('equal', 'box')
+        plt.show()
 
         print("Length of the line:", line_length)
 
@@ -417,9 +449,10 @@ for index, image_path in enumerate(image_paths):
         return(ray_vector)
 
     arucos_world() #Comment to erase aruco real world values
+    
     lc = 20
-
-
+    if debugmode==1:
+        continue
     # STL SCRIPT begins
     def polymaker(world_points, campP):
         msh.initialize()
@@ -513,45 +546,29 @@ for index, image_path in enumerate(image_paths):
         #booltest = msh.model.occ.intersect([(3,vlist[0])],[(3,vlist[1])], removeObject= True, removeTool = True)
         #booltest2 = msh.model.occ.cut([(3, test1)], [(3, test3)], removeObject=False)
     
-    _,v =polymaker(world_outline , cam_world)
+    _,v =polymaker(world_outline , cameraPosition)
     vlist.append(v)
     print()
     #optional  
-    if len(vlist) >  40: #test
+    if len(vlist) >  10: #test
         break
 
-#print('v',v)
 
-# #Now, perform boolean intersection with subsequent volumes
-#bool_result = msh.model.occ.intersect([(3, 3)], [(3, 8)], 8, removeObject=True, removeTool=True)
-#print(bool_result,'bool result')
-# msh.model.occ.synchronize()
-# msh.model.mesh.generate()
 # two = msh.model.occ.intersect([(3, 1)], [(3, 2)], 3,removeObject=True, removeTool=True)
 
 
 
-
-# # #Working Example of Boolean - note: booleans must be done one by one.
-# booled_object_list = [ [element] for element in vlist ]
+booled_object_list = [ [element] for element in vlist ]
 for index, value in enumerate (vlist) :
     value = msh.model.occ.intersect([(3,1)],[(3,value+1)],removeObject= True, removeTool = True)
-
-# # Working Example of Boolean - note: booleans must be done one by one.
-# booled_object_list = [[element] for element in vlist]
-# for i, value in enumerate(booled_object_list):
-#     booled_object_list[i] = msh.model.occ.intersect([(3, booled_object_list[i])], [(3, 1)], removeObject=False, removeTool=True)
-
-
-# print(booled_object_list)
-# #print(vlist)
+    
 
 
 # # Create the relevant msh data structures from the msh model
 msh.model.occ.synchronize()
 # Set visibility options to hide points, lines, and 3D faces
 msh.option.setNumber("General.Verbosity", 1)  # 1=Show all messages and warnings
-msh.option.setNumber("Geometry.Points", 0)   
+msh.option.setNumber("Geometry.Points", 1)   
 msh.option.setNumber("Geometry.Lines", 0)   
 msh.option.setNumber("Mesh.SurfaceFaces", 0)      # Hide all points, lines, and 3D faces in the GUI
 msh.option.setNumber("Mesh.SurfaceEdges", 0)      # Hide all points, lines, and 3D faces in the GUI
