@@ -104,17 +104,15 @@ for index, image_path in enumerate(image_paths):
         # Parameters for detection
         dictionary= cv.aruco.getPredefinedDictionary(cv.aruco.DICT_5X5_50)
         parameters = cv.aruco.DetectorParameters()
-        parameters.cornerRefinementMethod = 1
+        parameters.cornerRefinementMethod = 0
         detector = cv.aruco.ArucoDetector(dictionary, parameters)
-        
-        #create image scaling (MUST BE SAME AS CALIBRAION PARAMS)
-
-        
+ 
         # Detect Aruco markers in the image
         corners, ids, _ = detector.detectMarkers(image)
+        
+        # Calculate the darkness value of the black portion of the marker
         drkcrnrs = []
         for i in range(len(corners)):
-            # Calculate the darkness value of the black portion of the marker
             darkness = Darkness_Calculator(image, corners[i][0].astype(int))
             drkcrnrs.append(darkness)
             print(f"Marker {ids[i][0]} Darkness: {darkness:.2f}")
@@ -122,7 +120,9 @@ for index, image_path in enumerate(image_paths):
         
         return corners, ids, darkness, drkcrnrs
 
+
     corners, ids, darkness, drkcrnrs = Aruco_Detector(image)
+
 
     #detects outlines of hook (uses independent resizing because of different Gamma requirements)
     def Contour_Finder(imagename):
@@ -143,68 +143,31 @@ for index, image_path in enumerate(image_paths):
         thresholded = cv.bitwise_not(thresholded)
         contours, hierarchy = cv.findContours(image=thresholded, mode=cv.RETR_EXTERNAL, method=cv.CHAIN_APPROX_NONE)
         
-        # retrieve largest contour only
-        contoursBIG = [max(contours, key=cv.contourArea)]
-        moments = cv.moments(contoursBIG[0])
-        cX = int(moments["m10"] / moments["m00"])
-        cY = int(moments["m01"] / moments["m00"])
-       
-        #ensure largest contour is central to the image
-        central_threshold = .5
-        distance_from_center = np.sqrt((cX - width/2)**2 + (cY - height/2)**2)
-        max_distance = np.sqrt((width/2)**2 + (height/2)**2)
-        print('Contour centroid displacement:',distance_from_center,'Maximum allowed displacement:', max_distance*central_threshold)
-        print()
-    
-        # Determine if the contour is off-center, if largest contour is offcenter return 0
-        offcenter = distance_from_center > central_threshold * max_distance
-        coords = list(zip((list(contoursBIG[0][:, 0][:, 0])), (list(contoursBIG[0][:, 0][:, 1]))))
-        # image for debugging - optional
-        if debugmode == 1:
-            img_with_contours = cv.cvtColor(img, cv.COLOR_GRAY2BGR,cv.WINDOW_NORMAL)
-            cv.drawContours(img_with_contours, [contoursBIG[0]], -1, (0, 255, 0), 2)
-            cv.imshow('Largest Contour Highlight', img_with_contours)
-            cv.waitKey(0)
-            cv.destroyAllWindows()
+        centroid_list = []
         
-        #only for testcenter - test
-        offcenter = True
+        for contour in contours:
+            moments = cv.moments(contour)
+            cX = int(moments["m10"] / moments["m00"])
+            cY = int(moments["m01"] / moments["m00"])
+            distance_from_center = np.sqrt((cX - width/2)**2 + (cY - height/2)**2)
+            #print(distance_from_center,'centroid distance from center')
+            centroid_list.append(distance_from_center)
         
-        if offcenter == False:
-            return coords
         
-        else:
-            # retrieve central contour
-            momentlist = []
-            
-            for i in contours:
-                moments = cv.moments(i)
-                momentlist.append(moments)
-                
-            centroid_list = []
-            for i in momentlist:
-                cX = int(i["m10"] / i["m00"])
-                cY = int(i["m01"] / i["m00"])
-                distance_from_center = np.sqrt((cX - width/2)**2 + (cY - height/2)**2)
-                #print(distance_from_center,'centroid distance from center')
-                centroid_list.append(distance_from_center)
-            
-            mincentroid = (min(centroid_list))
-            print(min(centroid_list),'min centroid distance')
-            x = centroid_list.index(mincentroid)
-            print(x)
-            
-            coords = list(zip((list(contours[x][:, 0][:, 0])), (list(contours[x][:, 0][:, 1]))))
+        mincentroid = min(centroid_list)
+        x = centroid_list.index(mincentroid)
+        print(min(centroid_list),f"Minimum centroid (ID: {x}) distance to center")
+        coords = list(zip(contours[x][:, 0][:, 0], contours[x][:, 0][:, 1]))
+        
+        return coords
+        # # Show the image with contours - optional
+        if debugmode ==1:
             img_with_contours = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
             cv.drawContours(img_with_contours, [contours[x]], -1, (0, 255, 0), 2)
-            return coords
-            # # Show the image with contours - optional
-            if debugmode ==1:
-                
-                cv.imshow('Central Contour Highlight', img_with_contours)
-                cv.waitKey(0)
-                cv.destroyAllWindows()
-        
+            cv.imshow('Central Contour Highlight', img_with_contours)
+            cv.waitKey(0)
+            cv.destroyAllWindows()
+    
     # Error handling for 0 contour result, continues loop. - check lighting and avoid dark objects in background or periphery')
     try:
         contour_points= (Contour_Finder(image_path)[::5]) #uses contours function!!!
@@ -336,27 +299,11 @@ for index, image_path in enumerate(image_paths):
             # Transform camera origin in World coordinate frame
             cam = np.array([0,0,0]).T; cam.shape = (3,1)
             cam_world = -rmat.T.dot(tvec) + rmat.T @ cam
-            
-            leftSideMat = (np.linalg.inv(rmat)*np.linalg.inv(CMTX)*p)
-            rightSideMat = (np.linalg.inv(rmat)*tvec)
-            
-            Zconst = 285.0
-
-            # Assuming rightSideMat and leftSideMat are NumPy matrices (2D arrays)
-            # You may need to create them or load them as per your data
-            
-            # Calculate 's' as per the C code
-            s = (Zconst + rightSideMat[2, 0]) / leftSideMat[2, 0]
-            
-            # Print the result
-            print("The value of s:", s)
-
-            
-            print('s',s)
+ 
             vector = pw - cam_world
             unit_vector = vector / np.linalg.norm(vector)
-            print('vector',vector)
-            print('unitvector',unit_vector)
+            # print('vector',vector)
+            # print('unitvector',unit_vector)
 
             stackx.append(unit_vector)
             p3D = cam_world + d * unit_vector
@@ -411,6 +358,7 @@ for index, image_path in enumerate(image_paths):
         
         # Calculate the ray between the centerpoint and cameraPosition
         ray_vector = cameraPosition - centerpoint
+        print(ray_vector, centerpoint,"RVRC")
         # Plot the ray as a line from the centerpoint to cameraPosition
         ax.plot([centerpoint[0], cameraPosition[0]],
             [centerpoint[1], cameraPosition[1]],
@@ -483,9 +431,6 @@ for index, image_path in enumerate(image_paths):
         
         # Create outlines of the object
         for i in range(len(example_points)):
-            # point_name = f'point_{i}'
-            # next_point_name = f'point_{(i+1)%len(example_points)}'
-            # line_name = f'line_{i}'
             line_handle = msh.model.occ.add_line(point_list[i], point_list[(i+1)%len(example_points)])
             perimeter_list.append(line_handle)
             if i == len(example_points) - 1:
@@ -495,9 +440,6 @@ for index, image_path in enumerate(image_paths):
         plin_list = []
         
         for i in range(len(example_points)):
-            # point_name = f'point_{i}'
-            # plin_name = f'plin_{i}'
-            # next_line_name = f'line_{(i+1)%len(example_points)}'
             plin_handle = msh.model.occ.add_line(point_list[i], camera_point)
             plin_list.append(plin_handle)
             if i == len(example_points) - 1:
@@ -507,10 +449,6 @@ for index, image_path in enumerate(image_paths):
         loop_list = []
         
         for i in range(len(example_points)):
-            # plin_name = f'plin_{i}'
-            # next_plin_name = f'plin_{(i+1)%len(example_points)}'
-            # next_line_name = f'line_{(i+1)%len(example_points)}'
-            # loop_name = f'loop_{i}'
             loop_handle = msh.model.occ.add_curve_loop([-plin_list[i], perimeter_list[i], plin_list[(i+1)%len(example_points)]])
             loop_list.append(loop_handle)
             if i == len(example_points) - 1:
@@ -540,11 +478,7 @@ for index, image_path in enumerate(image_paths):
         v = msh.model.occ.addVolume([sl]) 
         
         return mesh_test,v
-        #test = polymaker(world_points2,campP2)
-        #test3 = polymaker(world_points3,campP3)
-        #test4 = polymaker(world_points4,campP4)
-        #booltest = msh.model.occ.intersect([(3,vlist[0])],[(3,vlist[1])], removeObject= True, removeTool = True)
-        #booltest2 = msh.model.occ.cut([(3, test1)], [(3, test3)], removeObject=False)
+
     
     _,v =polymaker(world_outline , cameraPosition)
     vlist.append(v)
@@ -555,8 +489,6 @@ for index, image_path in enumerate(image_paths):
 
 
 # two = msh.model.occ.intersect([(3, 1)], [(3, 2)], 3,removeObject=True, removeTool=True)
-
-
 
 booled_object_list = [ [element] for element in vlist ]
 for index, value in enumerate (vlist) :
