@@ -49,13 +49,13 @@ for contour in contours:
     if area_ratio > 0.5:  # You can adjust this threshold
         filtered_contours.append(contour)
 
-# Now, 'filtered_contours' contains the valid contours that primarily occupy 
-#the central region of the image.
-"""
-Create polygons of white at aruco marker faces to prevent them being detected 
-as the object - 1.3.7 Vis_HullwBoolean
-"""
-corners, ids, darkness, drkcrnrs = Aruco_Detector(image) #LOCATION OF TEST
+    # Now, 'filtered_contours' contains the valid contours that primarily occupy 
+    #the central region of the image.
+    """
+    Create polygons of white at aruco marker faces to prevent them being detected 
+    as the object - 1.3.7 Vis_HullwBoolean
+    """
+    corners, ids, darkness, drkcrnrs = Aruco_Detector(image) #LOCATION OF TEST
   
     for i,value in enumerate(corners):
         start_point = tuple(map(int, tuple(corners[i][0][0])))

@@ -18,13 +18,13 @@ smalldim = 66.31
 largedim = 82.19
 aruco_scale = 56.76
 SCALING = 0.4
-debugmode=0
+debugmode=1
 vlist = []
 errorlist=[]
 
 #define folder path and image name pattern 
-folder_path = 'C:/Users/nicko/Downloads/'
-imagename_pattern = 'IMG_20230906_181423*'
+folder_path = 'C:/Users/nicko/Downloads/3dtedtcube'
+imagename_pattern = 'IMG*'
 
 #define camera calibration params - from calibrator script: currently using Joose iphone11 folder
 # CMTX = np.array([1231.5409815966082, 0.0, 809.22740[-68386823, 0.0, 1233.8258214550817, 583.4597389570841, 0.0, 0.0, 1.0], dtype='float32').reshape(3, 3)
@@ -46,18 +46,24 @@ imagename_pattern = 'IMG_20230906_181423*'
 CMTX = np.array([738.4391110895575, 0.0, 391.10649709357614, 0.0, 737.6804692382966, 516.2104937135692, 0.0, 0.0, 1.0], dtype='float32').reshape(3, 3)
 DIST = np.array([-0.028550282679872235, -0.01788452651293315, -0.0002072655617462208, 0.0006906692231601624, 0.5017724257813853], dtype='float32')
 
-centerpoint = [((aruco_scale*2)+smalldim)/2 , (aruco_scale*2+largedim)/2, 0]
+center_point = [((aruco_scale*2)+smalldim)/2 , (aruco_scale*2+largedim)/2, 0]
+
+# aruco_points = {
+#     8: np.array([[0, 0, 0], [aruco_scale, 0, 0], [aruco_scale, aruco_scale, 0], [0, aruco_scale, 0]], dtype='float32'),
+#     6: np.array([[smalldim + aruco_scale, 0, 0], [smalldim + 2 * aruco_scale, 0, 0],
+#                  [smalldim + 2 * aruco_scale, aruco_scale, 0], [smalldim + aruco_scale, aruco_scale, 0]], dtype='float32'),
+#     2: np.array([[0, largedim + aruco_scale, 0], [aruco_scale, largedim + aruco_scale, 0],
+#                  [aruco_scale, largedim + 2 * aruco_scale, 0], [0, largedim + 2 * aruco_scale, 0]], dtype='float32'),
+#     4: np.array([[smalldim + aruco_scale, largedim + aruco_scale, 0], [smalldim + 2 * aruco_scale, largedim + aruco_scale, 0],
+#                  [smalldim + 2 * aruco_scale, largedim + 2 * aruco_scale, 0], [smalldim + aruco_scale, largedim + 2 * aruco_scale, 0]], dtype='float32'),
+# }
 
 aruco_points = {
-    8: np.array([[0, 0, 0], [aruco_scale, 0, 0], [aruco_scale, aruco_scale, 0], [0, aruco_scale, 0]], dtype='float32'),
-    6: np.array([[smalldim + aruco_scale, 0, 0], [smalldim + 2 * aruco_scale, 0, 0],
-                 [smalldim + 2 * aruco_scale, aruco_scale, 0], [smalldim + aruco_scale, aruco_scale, 0]], dtype='float32'),
-    2: np.array([[0, largedim + aruco_scale, 0], [aruco_scale, largedim + aruco_scale, 0],
-                 [aruco_scale, largedim + 2 * aruco_scale, 0], [0, largedim + 2 * aruco_scale, 0]], dtype='float32'),
-    4: np.array([[smalldim + aruco_scale, largedim + aruco_scale, 0], [smalldim + 2 * aruco_scale, largedim + aruco_scale, 0],
-                 [smalldim + 2 * aruco_scale, largedim + 2 * aruco_scale, 0], [smalldim + aruco_scale, largedim + 2 * aruco_scale, 0]], dtype='float32'),
-}
-
+    39: np.array([[32.5,-32.5,-2.5],[32.5,32.5,-2.5],[32.5,-32.5,-62.5],[32.5,32.5,-62.5]], dtype='float32'),
+    40: np.array([[32.5,32.5,-2.5],[-32.5,32.5,-2.5],[32.5,32.5,-62.5],[-32.5,32.5,-62.5]], dtype='float32'),
+    41: np.array([[-32.5,32.5,-2.5],[-32.5,-32.5,-2.5],[-32.5,-32.5,-62.5],[-32.5,32.5,-62.5]], dtype='float32'),
+    42: np.array([[-32.5,-32.5,-2.5],[32.5,-32.5,-2.5],[32.5,-32.5,-62.5],[-32.5,-32.5,-62.5]], dtype='float32')
+    }
 
 #options for msh - move later
 msh.initialize(sys.argv)
@@ -317,7 +323,7 @@ for index, image_path in enumerate(image_paths):
     
     # Plotting the lines between the camera position and the unit vectors
     world_outline = []
-    def Set_Object_Plane(point, direction):
+    def Set_Object_Plane(point, direction,D):
         x, y, z = point
         dx, dy, dz = direction
         
@@ -329,12 +335,12 @@ for index, image_path in enumerate(image_paths):
         t = -z / dz
         x_intercept = x + dx * t
         y_intercept = y + dy * t
-        z_intercept = 0
+        z_intercept = D
         
         world_outline = (x_intercept, y_intercept, z_intercept)
         return world_outline
 
-    world_outline = []
+
     #optional
     def arucos_world():
         fig = plt.figure()
@@ -352,26 +358,44 @@ for index, image_path in enumerate(image_paths):
         for value in world_outline:
             ax.scatter(*value, color="cyan", marker="." )  
 
-              # Add the centerpoint here
+              # Add the center_point here
 
-        ax.scatter(*centerpoint, color="red", marker="o")  # Use a red circle marker for the centerpoint
+        ax.scatter(*center_point, color="red", marker="o")  # Use a red circle marker for the center_point
         
-        # Calculate the ray between the centerpoint and cameraPosition
-        ray_vector = cameraPosition - centerpoint
-        print(ray_vector, centerpoint,"RVRC")
-        # Plot the ray as a line from the centerpoint to cameraPosition
-        ax.plot([centerpoint[0], cameraPosition[0]],
-            [centerpoint[1], cameraPosition[1]],
-            [centerpoint[2], cameraPosition[2]],
+        # Calculate the ray between the center_point and cameraPosition
+        ray_vector = cameraPosition - center_point
+        print(ray_vector, center_point,"RVRC")
+        # Given point on the plane
+        point_on_plane = np.array(center_point)
+
+        # Given ray vector
+        ray_vector = np.array(ray_vector)
+        
+        # Calculate the normal vector by normalizing the ray vector
+        normal_vector = ray_vector / np.linalg.norm(ray_vector)
+
+        # Calculate the constant 'D' using the dot product of the normal vector and the point
+        D = np.dot(normal_vector, point_on_plane)
+
+        # Extract components of the normal vector (A, B, C)
+        A1, B2, C3 = normal_vector
+
+        # Create a variable for the plane equation
+        plane_equation = f"{A1:.4f}x + {B2:.4f}y + {C3:.4f}z = {D:.4f}"
+        
+        # Plot the ray as a line from the center_point to cameraPosition
+        ax.plot([center_point[0], cameraPosition[0]],
+            [center_point[1], cameraPosition[1]],
+            [center_point[2], cameraPosition[2]],
             color='green', linestyle='--')
-        line_length = np.linalg.norm(centerpoint - cameraPosition)
+        line_length = np.linalg.norm(center_point - cameraPosition)
         
                 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         
         for vector in stackx:
-            wo = Set_Object_Plane(cam_world,vector)
+            wo = Set_Object_Plane(cam_world,vector,D)
             world_outline.append(wo)
             
         #print(world_outline, image_path)
