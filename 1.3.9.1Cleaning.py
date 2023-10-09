@@ -12,12 +12,12 @@ msh.initialize(sys.argv)
 aruco_scale = 56.76
 LC = 20 #for GMSH
 SCALING = 0.4
-debug_mode=1
+debug_mode = 1
 projection_list = []
 
 #define folder path and image name pattern 
-folder_path = 'C:/Users/skippy/Downloads/'
-imagename_pattern = 'IMG_20231002*'
+folder_path = 'C:/Users/nicko/Downloads/'
+imagename_pattern = 'IMG_20231002_034*'
 
 
 #define camera calibration params - from calibrator script: currently using Joose iphone11 folder
@@ -44,11 +44,7 @@ aruco_points = {
     }
 
 
-
-
 # msh.option.setNumber("General.AbortOnError", 1)
-
-
 
 # darkness caLCulator
 def caLCulate_darkness(image, contour):
@@ -71,7 +67,7 @@ def detect_markers(image):
     # Parameters for detection
     dictionary= cv.aruco.getPredefinedDictionary(cv.aruco.DICT_5X5_50)
     parameters = cv.aruco.DetectorParameters()
-    parameters.cornerRefinementMethod = 1
+    parameters.cornerRefinementMethod = 0
     detector = cv.aruco.ArucoDetector(dictionary, parameters)
     
     
@@ -220,7 +216,6 @@ def coordinate_visualizer(aruco_scale):
     cv.waitKey(0)
     cv.destroyAllWindows()
     
-# Projects world contour rays onto the normal plane
 def dimensional_transforms_contours(contour_points):
    
     # Convert 2D points to 3D rays
@@ -228,7 +223,7 @@ def dimensional_transforms_contours(contour_points):
     point3D = []
     d=0
     world_coordinates_list = []
-    vectorlist = []
+    vector_list = []
     
     for image_coordinates in contour_points:
     
@@ -254,9 +249,9 @@ def dimensional_transforms_contours(contour_points):
         
         p3D = cam_world + d * unit_vector
         point3D.append(p3D)
-        vectorlist.append(vector)
+        vector_list.append(vector)
         
-    return unit_vector_list,cam_world
+    return unit_vector_list,cam_world,vector_list,world_coordinates_list
 
  
 # Creates a plane normal to the vector between the object centroid and the camera
@@ -379,7 +374,7 @@ for index, image_path in enumerate(image_paths):
 
     # Error handling for 0 contour result, continues loop. - check lighting and avoid dark objects in background or periphery')
     try:
-        contour_points= (find_contours(image_path,debug_mode)[::5]) #uses contours function!!!
+        contour_points= (find_contours(image_path,debug_mode)[::10]) #uses contours function!!!
     except:
         print('(',image_path,'):find_contour error')
         print()
@@ -390,12 +385,22 @@ for index, image_path in enumerate(image_paths):
 
     H,cameraPosition,rmat,tvec,rotation_vector = pnp_solver()
 
-    unit_vector_list,cam_world  = dimensional_transforms_contours(contour_points)
+    unit_vector_list,cam_world,vector_list,world_frame_coordinate_list  = dimensional_transforms_contours(contour_points)
  
 
     
         
-    
+    tuple_list = []
+    # Iterate through the arrays in the tuple
+    for array in corners:
+        # Iterate through the rows in the array
+        for row in array[0]:
+            # Extract the two values from each row and convert them into a tuple
+            value_tuple = tuple(row)
+            # Append the tuple to the tuple_list
+            tuple_list.append(value_tuple)
+        
+    unit_vector_list_arucos,cam_world_arucos,_,_  = dimensional_transforms_contours(tuple_list)
     
     
     #optional
@@ -416,12 +421,15 @@ for index, image_path in enumerate(image_paths):
         #     ax.scatter(*value, color="cyan", marker="." )  
 
               # Add the centerpoint here
-        centerpoint = [[0], [20], [0]]
+        centerpoint = [[0], [0], [0]]
 
         ax.scatter(*centerpoint, color="red", marker="o")  # Use a red circle marker for the centerpoint
         
         # CaLCulate the ray between the centerpoint and cam_world
         ray_vector = cam_world - centerpoint
+        
+        
+        
         # Plot the ray as a line from the centerpoint to cam_world
         ax.plot([centerpoint[0], cam_world[0]],
             [centerpoint[1], cam_world[1]],
@@ -431,8 +439,8 @@ for index, image_path in enumerate(image_paths):
 
         print("Length of the line:", line_length)
 
-        ax.elev = 90
-        ax.azim = -90
+        ax.elev = 45
+        ax.azim = 0 
         ax.set_xlabel('X-axis')
         ax.set_ylabel('Y-axis')
         ax.set_zlabel('Z-axis')
@@ -448,29 +456,40 @@ for index, image_path in enumerate(image_paths):
         # Plot the line between cam_world and unit vectors in unit_vector_list
         for unit_vector in unit_vector_list:
             # Create points for the line
-            x_points = [cam_world[0, 0], cam_world[0, 0] + unit_vector[0, 0]]
-            y_points = [cam_world[1, 0], cam_world[1, 0] + unit_vector[1, 0]]
-            z_points = [cam_world[2, 0], cam_world[2, 0] + unit_vector[2, 0]]
+            x_points = [cam_world[0, 0], cam_world[0, 0] + unit_vector[0, 0]*line_length]
+            y_points = [cam_world[1, 0], cam_world[1, 0] + unit_vector[1, 0]*line_length]
+            z_points = [cam_world[2, 0], cam_world[2, 0] + unit_vector[2, 0]*line_length]
 
             # Use the common color for all lines
             ax.plot(x_points, y_points, z_points, color=line_color)
+            
+        for value in aruco_points.values():
+            for point in value:
+                aruco_points_list.append(point)
+                #aruco_points_list.append([500,500,0])
+                ax.scatter(*point, color="black", marker="x" ) 
+        # Customize the plot as 
 
-        # Customize the plot as needed
+        
         ax.set_xlabel('X Label')
         ax.set_ylabel('Y Label')
         ax.set_zlabel('Z Label')
         ax.set_title('Lines between cam_world and unit vectors')
-
+        ax.set_aspect('equal', 'box')
+        ax.elev = 0
+        ax.azim = -30 
         # Show the plot
         plt.show()
             
-        return unit_vector_list,cam_world#,world_coordinates_list,vectorlist,point3D
-        return(ray_vector)
+        return ray_vector,x_points #,world_coordinates_list,vectorlist,point3D
+        
+    ray_vector,x_points = arucos_world(cam_world,unit_vector_list) #Comment to erase aruco real world values
+    ray_vector_aruco,x_points_aruco = arucos_world(cam_world_arucos ,unit_vector_list_arucos) #Comment to erase aruco real world values
 
-    #  arucos_world(cam_world,unit_vector_list) #Comment to erase aruco real world values
+    # coordinate_visualizer(aruco_scale)
 
 
-   
+
 
 #     _,v =polyhedron_obj_converter(world_outline , cam_world)
 #     projection_list.append(v)
