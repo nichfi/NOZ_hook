@@ -12,11 +12,11 @@ msh.initialize(sys.argv)
 aruco_scale = 56.76
 LC = 20 #for GMSH
 SCALING = 0.4
-debug_mode = 1
+debug_mode = 0
 projection_list = []
 
 #define folder path and image name pattern 
-folder_path = 'C:/Users/nicko/Downloads/'
+folder_path = 'C:/Users/skippy/Downloads/'
 imagename_pattern = 'IMG_20231002_034*'
 
 
@@ -187,12 +187,12 @@ def pnp_solver():
     rmat = cv.Rodrigues(rotation_vector)[0]
     
     #CaLCulates camera position from rotation matrix and translation vector
-    cameraPosition = np.array(-np.matrix(rmat).T * np.matrix(tvec))
+    camera_position_pnp = np.array(-np.matrix(rmat).T * np.matrix(tvec))
     
     #creates Camera projection matrix from multiplying camera calibration matrix by the first two columns 
     #of the rotation matrix and 1st column of translation vector
     H = CMTX @ np.column_stack((rmat[:, 0], rmat[:, 1], tvec[:, 0]))
-    return H,cameraPosition,rmat,tvec,rotation_vector
+    return H,camera_position_pnp,rmat,tvec,rotation_vector
 
 # Coordinate visualizer - optional
 def coordinate_visualizer(aruco_scale):
@@ -279,7 +279,7 @@ def polyhedron_obj_converter(world_points, campP):
     msh.initialize()
     msh.option.setNumber("General.AbortOnError", 1) #Exception: Could not get last error Error   : Gmsh has not been initialized
         
-    testcp = [[i[0],i[1],0] for i in world_points]
+    testcp = [[i[0],i[1],i[2]] for i in world_points]
     #testcamp = tuple([item for sublist in campP1 for item in sublist])
     
     x = round(campP[0][0])
@@ -383,7 +383,7 @@ for index, image_path in enumerate(image_paths):
 
     reshaped_array_img, reshaped_array_obj = multi_pose_estimator(ids)
 
-    H,cameraPosition,rmat,tvec,rotation_vector = pnp_solver()
+    H,camera_position_pnp,rmat,tvec,rotation_vector = pnp_solver()
 
     unit_vector_list,cam_world,vector_list,world_frame_coordinate_list  = dimensional_transforms_contours(contour_points)
  
@@ -399,10 +399,39 @@ for index, image_path in enumerate(image_paths):
             value_tuple = tuple(row)
             # Append the tuple to the tuple_list
             tuple_list.append(value_tuple)
-        
     unit_vector_list_arucos,cam_world_arucos,_,_  = dimensional_transforms_contours(tuple_list)
     
     
+    
+    
+    # CaLCulate the ray between the centerpoint and cam_world
+    centerpoint = [[0], [0], [0]]
+
+    ray_vector = cam_world - centerpoint
+    far_point = -(cam_world)
+    D_far = ray_vector[0]*far_point[0]+ray_vector[1]*far_point[1]+ray_vector[2]*far_point[2]
+
+    origin_point = [cam_world[0],cam_world[1],cam_world[2]]
+    # Initialize a list to store intersection points
+    intersection_point_list = []
+    
+    # Iterate through each unit vector
+    for unit_vector in unit_vector_list:
+        # Calculate the intersection point with the plane
+        # The equation of the line is x = x0 + t * u, y = y0 + t * v, z = z0 + t * w
+        # Solve for t using the plane equation and the equation of the line
+        t = (D_far - ray_vector[0] * origin_point[0] - ray_vector[1] * origin_point[1] - ray_vector[2] * origin_point[2]) / (ray_vector[0] * unit_vector[0] + ray_vector[1] * unit_vector[1] + ray_vector[2] * unit_vector[2])
+    
+        # Calculate the intersection point
+        intersection_point = (origin_point[0] + t * unit_vector[0], origin_point[1] + t * unit_vector[1], origin_point[2] + t * unit_vector[2])
+    
+        intersection_point_list.append(intersection_point)
+       
+        
+       
+        
+       
+        
     #optional
     def arucos_world(cam_world,unit_vector_list):
         fig = plt.figure()
@@ -427,8 +456,8 @@ for index, image_path in enumerate(image_paths):
         
         # CaLCulate the ray between the centerpoint and cam_world
         ray_vector = cam_world - centerpoint
-        
-        
+        far_point = -(cam_world)
+        D_far = ray_vector[0]*far_point[0]+ray_vector[1]*far_point[1]+ray_vector[2]*far_point[2]
         
         # Plot the ray as a line from the centerpoint to cam_world
         ax.plot([centerpoint[0], cam_world[0]],
@@ -477,7 +506,7 @@ for index, image_path in enumerate(image_paths):
         ax.set_title('Lines between cam_world and unit vectors')
         ax.set_aspect('equal', 'box')
         ax.elev = 0
-        ax.azim = -30 
+        ax.azim = -30
         # Show the plot
         plt.show()
             
@@ -491,45 +520,45 @@ for index, image_path in enumerate(image_paths):
 
 
 
-#     _,v =polyhedron_obj_converter(world_outline , cam_world)
-#     projection_list.append(v)
-#     print()
-#     #optional  
-#     if len(projection_list) >  40: #test
-#         break
+    _,v =polyhedron_obj_converter(intersection_point_list , cam_world)
+    projection_list.append(v)
+    print()
+    #optional  
+    if len(projection_list) >  40: #test
+        break
 
 
-# for index, value in enumerate (projection_list) :
-#     value = msh.model.occ.intersect([(3,1)],[(3,value+1)],removeObject= True, removeTool = True)
+for index, value in enumerate (projection_list) :
+    value = msh.model.occ.intersect([(3,1)],[(3,value+1)],removeObject= True, removeTool = True)
 
 
-# # # Create the relevant msh data structures from the msh model
-# msh.model.occ.synchronize()
-# # Set visibility options to hide points, lines, and 3D faces
-# msh.option.setNumber("General.Verbosity", 1)  # 1=Show all messages and warnings
-# msh.option.setNumber("Geometry.Points", 0)   
-# msh.option.setNumber("Geometry.Lines", 0)   
-# msh.option.setNumber("Mesh.SurfaceFaces", 0)      # Hide all points, lines, and 3D faces in the GUI
-# msh.option.setNumber("Mesh.SurfaceEdges", 0)      # Hide all points, lines, and 3D faces in the GUI
-# msh.option.setNumber("Mesh.VolumeFaces", 1)      # Hide all points, lines, and 3D faces in the GUI
-# msh.option.setNumber("Mesh.VolumeEdges", 0)      # Hide all points, lines, and 3D faces in the GUI
+# # Create the relevant msh data structures from the msh model
+msh.model.occ.synchronize()
+# Set visibility options to hide points, lines, and 3D faces
+msh.option.setNumber("General.Verbosity", 1)  # 1=Show all messages and warnings
+msh.option.setNumber("Geometry.Points", 0)   
+msh.option.setNumber("Geometry.Lines", 0)   
+msh.option.setNumber("Mesh.SurfaceFaces", 0)      # Hide all points, lines, and 3D faces in the GUI
+msh.option.setNumber("Mesh.SurfaceEdges", 0)      # Hide all points, lines, and 3D faces in the GUI
+msh.option.setNumber("Mesh.VolumeFaces", 1)      # Hide all points, lines, and 3D faces in the GUI
+msh.option.setNumber("Mesh.VolumeEdges", 0)      # Hide all points, lines, and 3D faces in the GUI
 
 
-# # #msh.model.mesh.Triangles(0)
+# #msh.model.mesh.Triangles(0)
 
 
-# # Generate mesh
-# msh.model.mesh.generate()
+# Generate mesh
+msh.model.mesh.generate()
 
-# # Write mesh data
-# msh.write("GFG.msh")
+# Write mesh data
+msh.write("GFG.msh")
 
-# # Run the graphical user interface event loop
-# msh.fltk.run()
-# #msh.hide(all) hide meshs
-# #msh.optimize_threshold
+# Run the graphical user interface event loop
+msh.fltk.run()
+#msh.hide(all) hide meshs
+#msh.optimize_threshold
 
-# # Finalize the msh API
-# msh.finalize()
+# Finalize the msh API
+msh.finalize()
 
         
